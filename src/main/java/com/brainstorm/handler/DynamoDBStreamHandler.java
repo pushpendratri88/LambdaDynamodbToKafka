@@ -53,10 +53,12 @@ public class DynamoDBStreamHandler implements RequestHandler<DynamodbEvent, Stri
                 logger.info("New Record Image: {}", record.getDynamodb().getNewImage());
                 try {
                     String jsonData = objectMapper.writeValueAsString(record.getDynamodb().getNewImage().get("logevent").getS());
-                    logger.info("Before publishing event to Kafka: {}", jsonData);
-                    kafkaProducer.send(new ProducerRecord<>(TOPIC, jsonData)).get();
+                    String unescapedJson = jsonData.replace("\\", "");
+                    unescapedJson = unescapedJson.substring(1, unescapedJson.length() - 1);
+                    logger.info("Before publishing event to Kafka: {}", unescapedJson);
+                    kafkaProducer.send(new ProducerRecord<>(TOPIC, unescapedJson)).get();
                     kafkaProducer.flush();
-                    logger.info("Published event to Kafka: {}", jsonData);
+                    logger.info("Published event to Kafka: {}", unescapedJson);
                 } catch (Exception e) {
                     logger.error("Error sending data to Kafka", e);
                 }
