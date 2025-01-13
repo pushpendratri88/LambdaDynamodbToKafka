@@ -10,10 +10,6 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.kafka.core.KafkaTemplate;
-
-
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.Properties;
@@ -27,8 +23,6 @@ public class DynamoDBStreamHandler implements RequestHandler<DynamodbEvent, Stri
     private static final String BOOTSTRAP_SERVERS = "13.203.157.163:9092";
 
     private static KafkaProducer<String, String> kafkaProducer;
-    @Autowired
-    private KafkaTemplate<String, Object> kafkaTemplate;
 
     // Static block to initialize Kafka Producer once
     static {
@@ -55,17 +49,16 @@ public class DynamoDBStreamHandler implements RequestHandler<DynamodbEvent, Stri
         dynamodbEvent.getRecords().forEach(record -> {
             String eventName = record.getEventName();  // INSERT, MODIFY
             logger.info("EventName : {}", eventName);
-            if (record.getDynamodb().getNewImage() != null) {
-                if ("INSERT".equals(eventName) || "MODIFY".equals(eventName)){
-                    logger.info("New Record Image: {}", record.getDynamodb().getNewImage());
-                    try {
-                        String jsonData = objectMapper.writeValueAsString(record.getDynamodb().getNewImage());
-                        logger.info("Before publishing event to Kafka: {}", jsonData);
-                        kafkaProducer.send(new ProducerRecord<>(TOPIC, jsonData));
-                        logger.info("Published event to Kafka: {}", jsonData);
-                    } catch (Exception e) {
-                        logger.error("Error sending data to Kafka", e);
-                    }
+            if (record.getDynamodb().getNewImage() != null && ("INSERT".equals(eventName) || "MODIFY".equals(eventName))) {
+                logger.info("New Record Image: {}", record.getDynamodb().getNewImage());
+                try {
+                    String jsonData = objectMapper.writeValueAsString(record.getDynamodb().getNewImage().get("logevent").getS());
+                    logger.info("Before publishing event to Kafka: {}", jsonData);
+                    kafkaProducer.send(new ProducerRecord<>(TOPIC, jsonData)).get();
+                    kafkaProducer.flush();
+                    logger.info("Published event to Kafka: {}", jsonData);
+                } catch (Exception e) {
+                    logger.error("Error sending data to Kafka", e);
                 }
             }
         });
